@@ -41,6 +41,6 @@ def get_interface(bound):
 
 
 def start_sniffing(interface):
-    sniff(iface=interface,         # interface to listen on
+    sniff(iface=interface,          # interface to listen on
           prn=IDS.inspect_packets,  # function to execute for each sniffed packet
-          store=0)                 # sniffed packets will not stored in RAM
+          store=0)                  # sniffed packets will not stored in RAM
