@@ -1,4 +1,5 @@
 from scapy.all import *
+import IDS
 
 # This module will be responsible of listing the available interfaces
 # to the user and start listening on the selected one
@@ -17,7 +18,7 @@ def list_interfaces():
         i += 1
 
     selection = get_interface(len(interfaces))
-    print(interfaces[selection-1])
+    return interfaces[selection - 1]
 
 
 # Method for input validation
@@ -31,10 +32,15 @@ def get_interface(bound):
             continue
 
         # Check if the input value is in the valid range
-        if value < 0 or value > bound:
+        if value <= 0 or value > bound:
             print("Interface not in the list...")
             continue
         else:
             break
-
     return value
+
+
+def start_sniffing(interface):
+    sniff(iface=interface,         # interface to listen on
+          prn=IDS.analize_packet,  # function to execute for each sniffed packet
+          store=0)                 # sniffed packets will not stored in RAM
