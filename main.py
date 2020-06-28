@@ -1,5 +1,12 @@
 # Main file
 import sniffer
 
-sniffer.list_interfaces()
+def main():
+    interface = sniffer.list_interfaces()
+    sniffer.start_sniffing(interface)
+
+
+if __name__ == '__main__':
+    main()
+
 
