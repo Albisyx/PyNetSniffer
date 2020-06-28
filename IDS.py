@@ -1,9 +1,12 @@
 from scapy.layers.inet import *
+from socket import gethostname, gethostbyname
 
 # Module that implement the intrusion detection capabilities.
 # The two attacks that will be detected are:
 # 1) port scanning attempts
 # 2) SYN Flood attack
+
+tcp_syn = dict()
 
 
 # The following method is called whenever a packet is sniffed on the selected
@@ -13,20 +16,32 @@ def inspect_packets(packet):
     if IP not in packet:
         return
 
-    # Both port scanning and SYN Flood use TCP, so let's discard all packets that
-    # don't contain a TCP header.
-    if TCP not in packet:
+    # Now that we are sure to deal with an IP packet, let's check if it is directed to
+    # our machine. We only want to inspect packets addressed to us.
+    local_ip = gethostbyname(gethostname())  # local IP address
+    if packet[IP].dst != local_ip:
         return
 
-    # At this point we have a packet which for sure has a TCP segment.
+    # At this point we have a packet which for sure has an IP
+    # header and it is directed to our machine.
     # Now it's time to detect possible attacks.
-    detect_port_scanning(packet[TCP])
-    detect_syn_flood(packet[TCP])
+    detect_port_scanning(packet)
+    detect_syn_flood(packet)
 
 
-def detect_port_scanning(tcp_segment):
-    pass
+def detect_port_scanning(pkt):
+    # TCP SYN scan detection
+    source_ip = pkt[IP].src
+    flags = str(pkt[TCP].flags)
+    if flags == 'S':  # SYN bit is set
+        if source_ip not in tcp_syn:
+            tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
+        tcp_syn[source_ip]["SYN"] += 1
+    elif flags == 'SA':  # SYN and ACK bits are set
+        if source_ip not in tcp_syn:
+            tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
+        tcp_syn[source_ip]["SYN-ACK"] += 1
 
 
-def detect_syn_flood(tcp_segment):
+def detect_syn_flood(pkt):
     pass
