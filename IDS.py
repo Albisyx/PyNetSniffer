@@ -4,6 +4,9 @@ from socket import gethostname, gethostbyname
 # Class that implements the intrusion detection capabilities.
 # The two attacks that will be detected are:
 # 1) port scanning attempts
+#    The following port scans attempts will be detected:
+#    - TCP FIN port scanning
+#    - TCP X-Mas port scanning
 # 2) SYN Flood attack
 
 
