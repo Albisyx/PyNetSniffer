@@ -6,12 +6,14 @@ from socket import gethostname, gethostbyname
 # 1) port scanning attempts
 # 2) SYN Flood attack
 
-class IDS:
+
+class Detector:
     def __init__(self):
         self.tcp_fin = dict()
         self.tcp_xmas = dict()
         self.tcp_syn = dict()
-
+        self.local_ip = gethostbyname(gethostname())  # local IP address
+        self.PORT_SCAN_THRESHOLD = 250
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -22,26 +24,46 @@ class IDS:
 
         # Now that we are sure to deal with an IP packet, let's check if it is directed to
         # our machine. We only want to inspect packets addressed to us.
-        # local_ip = gethostbyname(gethostname())  # local IP address
-        # if packet[IP].dst != local_ip:
-        #     return
+        if packet[IP].src == self.local_ip:
+            return
+
+        if TCP not in packet:
+            return
 
         # At this point we have a packet which for sure has an IP
         # header and it is directed to our machine.
         # Now it's time to detect possible attacks.
-        detect_port_scanning(packet)
-        detect_syn_flood(packet)
-
+        self.detect_port_scanning(packet)
+        # detect_syn_flood(packet)
 
     def detect_port_scanning(self, pkt):
-        # TCP FIN scan detection
         source_ip = pkt[IP].src
         flags = str(pkt[TCP].flags)
-        if flags == 'F':
-            
+        if flags == 'F':  # TCP FIN scan detection
+            if source_ip not in self.tcp_fin:
+                self.tcp_fin[source_ip] = {"FIN": 0}
+            self.tcp_fin[source_ip]["FIN"] += 1
+            self.tcp_fin_scan(pkt)
+        elif flags == 'FPU':  # TCP x-Mas scan detection
+            if source_ip not in self.tcp_xmas:
+                self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
+            self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
+            self.tcp_xmas_scan(pkt)
 
+    def tcp_fin_scan(self, pkt):
+        for ip in self.tcp_fin.keys():
+            if self.tcp_fin[ip]["FIN"] > self.PORT_SCAN_THRESHOLD:
+                print("{} is performing a FIN port scan".format(pkt[IP].src))
+                self.tcp_fin[ip]["FIN"] = 0
+
+    def tcp_xmas_scan(self, pkt):
+        for ip in self.tcp_xmas.keys():
+            if self.tcp_xmas[ip]["FIN-PSH-URG"] > self.PORT_SCAN_THRESHOLD:
+                print("{} is performing a X-Mas port scan".format(pkt[IP].src))
+                self.tcp_xmas[ip]["FIN-PSH-URG"] = 0
 
     def detect_syn_flood(self, pkt):
+        pass
         # source_ip = pkt[IP].src
         # flags = str(pkt[TCP].flags)
         # if flags == 'S':  # SYN bit is set

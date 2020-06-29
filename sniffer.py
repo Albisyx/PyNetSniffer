@@ -1,8 +1,10 @@
 from scapy.all import *
-import IDS
+from IDS import Detector
 
 # This module will be responsible of listing the available interfaces
 # to the user and start listening on the selected one
+
+ids = Detector()
 
 
 # Method for listing all the available interfaces to the user.
@@ -42,5 +44,5 @@ def get_interface(bound):
 
 def start_sniffing(interface):
     sniff(iface=interface,          # interface to listen on
-          prn=IDS.inspect_packets,  # function to execute for each sniffed packet
+          prn=ids.inspect_packets,  # function to execute for each sniffed packet
           store=0)                  # sniffed packets will not stored in RAM
