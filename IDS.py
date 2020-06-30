@@ -47,19 +47,19 @@ class Detector:
         # a TCP segment and the ones that are from our machine
         if TCP in packet and packet[IP].src != self.local_ip:
             self.detect_port_scanning(packet)
-            #self.detect_syn_flood(packet)
+            self.detect_syn_flood(packet)
 
     def detect_port_scanning(self, pkt):
         flags = pkt[TCP].flags
         if flags == 'F':  # TCP FIN scan detection
-            if source_ip not in self.tcp_fin:
-                self.tcp_fin[source_ip] = {"FIN": 0}
-            self.tcp_fin[source_ip]["FIN"] += 1
+            if pkt[IP].src not in self.tcp_fin:
+                self.tcp_fin[pkt[IP].src] = {"FIN": 0}
+            self.tcp_fin[pkt[IP].src]["FIN"] += 1
             self.tcp_fin_scan(pkt)
         elif flags == 'FPU':  # TCP x-Mas scan detection
-            if source_ip not in self.tcp_xmas:
-                self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
-            self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
+            if pkt[IP].src not in self.tcp_xmas:
+                self.tcp_xmas[pkt[IP].src] = {"FIN-PSH-URG": 0}
+            self.tcp_xmas[pkt[IP].src]["FIN-PSH-URG"] += 1
             self.tcp_xmas_scan(pkt)
 
     def tcp_fin_scan(self, pkt):
@@ -85,20 +85,9 @@ class Detector:
                 # If we are here and we detect a huge amount of SYN packets,
                 # a SYN Flood attack is may happening.
                 self.tcp_syn_count += 1
-                if self.tcp_syn_count >= self.TCP_SYN_THRESHOLD:
-                    print("{} is performing a SYN Flood attack with {} packets".format(pkt[IP].src, self.tcp_syn_count))
+                if self.tcp_syn_count == self.TCP_SYN_THRESHOLD:
+                    print("{} is performing a SYN Flood attack".format(pkt[IP].src))
             else:
                 # If we are here it means that the timer is elapsed, so we need to reset some attributes
                 self.tcp_syn_count = 0
                 self.time_first_syn = 0
-
-# source_ip = pkt[IP].src
-# flags = str(pkt[TCP].flags)
-# if flags == 'S':  # SYN bit is set
-#     if source_ip not in tcp_syn:
-#         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
-#     tcp_syn[source_ip]["SYN"] += 1
-# elif flags == 'SA':  # SYN and ACK bits are set
-#     if source_ip not in tcp_syn:
-#         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
-#     tcp_syn[source_ip]["SYN-ACK"] += 1
