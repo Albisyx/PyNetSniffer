@@ -1,3 +1,4 @@
+import time as t
 from scapy.layers.inet import *
 from socket import gethostname, gethostbyname
 
@@ -16,7 +17,9 @@ class Detector:
         self.tcp_xmas = dict()
         self.tcp_syn = dict()
         self.local_ip = gethostbyname(gethostname())  # local IP address
+        self.seconds = 0  # will contain the current timestamp
         self.PORT_SCAN_THRESHOLD = 500
+        self.SYN_FLOOD_DETECT_TIME = 5  # number of seconds within a SYN Flood attack must be detected
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -26,28 +29,24 @@ class Detector:
         if IP not in packet:
             return
 
-        # Now that we are sure to deal with an IP packet, let's check if it is directed to
-        # our machine. We only want to inspect packets addressed to us.
-        if packet[IP].src == self.local_ip:
-            return
-
-        # Let's discard all packets that are not TCP, UDP or ICMP
+        # Let's discard all packets that are not TCP, UDP or ICMP in order to log them
         if TCP not in packet and \
            UDP not in packet and \
            ICMP not in packet:
             return
 
-        # At this point we have a packet which for sure has an IP
-        # header, it contains TCP, UDP or ICMP segment and it is directed to our machine.
+        # At this point we have a packet which for sure has an IP header
+        # and it contains TCP, UDP or ICMP segment.
         # Now it's time to detect possible attacks.
         self.detect_port_scanning(packet)
-        # detect_syn_flood(packet)
+        self.detect_syn_flood(packet)
 
     def detect_port_scanning(self, pkt):
         source_ip = pkt[IP].src
 
-        # We are about to detect only port scanning attempts that are made with TCP
-        if TCP in pkt:
+        # We are detecting only port scanning attempts that are made with TCP.
+        # We must also make sure that the packet is not from our machine.
+        if TCP in pkt and pkt[IP].src != self.local_ip:
             flags = str(pkt[TCP].flags)
             if flags == 'F':  # TCP FIN scan detection
                 if source_ip not in self.tcp_fin:
@@ -72,15 +71,20 @@ class Detector:
                 print("{} is performing a X-Mas port scan".format(pkt[IP].src))
                 self.tcp_xmas[ip]["FIN-PSH-URG"] = 0
 
+    # This method tries to detect a SYN Flood attack by using an interval of time.
+    # Basically it starts a timer when the first TCP SYN packet is encountered.
+    # If it detect a large number of SYN packets before the timer is elapsed, a SYN flood attack is may happening.
     def detect_syn_flood(self, pkt):
-        pass
-        # source_ip = pkt[IP].src
-        # flags = str(pkt[TCP].flags)
-        # if flags == 'S':  # SYN bit is set
-        #     if source_ip not in tcp_syn:
-        #         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
-        #     tcp_syn[source_ip]["SYN"] += 1
-        # elif flags == 'SA':  # SYN and ACK bits are set
-        #     if source_ip not in tcp_syn:
-        #         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
-        #     tcp_syn[source_ip]["SYN-ACK"] += 1
+
+
+
+# source_ip = pkt[IP].src
+# flags = str(pkt[TCP].flags)
+# if flags == 'S':  # SYN bit is set
+#     if source_ip not in tcp_syn:
+#         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
+#     tcp_syn[source_ip]["SYN"] += 1
+# elif flags == 'SA':  # SYN and ACK bits are set
+#     if source_ip not in tcp_syn:
+#         tcp_syn[source_ip] = {"SYN" : 0, "SYN-ACK" : 0}
+#     tcp_syn[source_ip]["SYN-ACK"] += 1
