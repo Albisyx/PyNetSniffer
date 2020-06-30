@@ -15,11 +15,12 @@ class Detector:
     def __init__(self):
         self.tcp_fin = dict()
         self.tcp_xmas = dict()
-        self.tcp_syn = dict()
         self.local_ip = gethostbyname(gethostname())  # local IP address
-        self.seconds = 0  # will contain the current timestamp
+        self.time_first_syn = 0  # timestamp of the first TCP SYN packet encountered
+        self.tcp_syn_count = 0
         self.PORT_SCAN_THRESHOLD = 500
-        self.SYN_FLOOD_DETECT_TIME = 5  # number of seconds within a SYN Flood attack must be detected
+        self.TCP_SYN_THRESHOLD = 500
+        self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -37,27 +38,29 @@ class Detector:
 
         # At this point we have a packet which for sure has an IP header
         # and it contains TCP, UDP or ICMP segment.
+
+        # Log packets to a file
+
+
         # Now it's time to detect possible attacks.
-        self.detect_port_scanning(packet)
-        self.detect_syn_flood(packet)
+        # Since the detectable attacks use only TCP, let's filter packets that have not
+        # a TCP segment and the ones that are from our machine
+        if TCP in packet and packet[IP].src != self.local_ip:
+            self.detect_port_scanning(packet)
+            #self.detect_syn_flood(packet)
 
     def detect_port_scanning(self, pkt):
-        source_ip = pkt[IP].src
-
-        # We are detecting only port scanning attempts that are made with TCP.
-        # We must also make sure that the packet is not from our machine.
-        if TCP in pkt and pkt[IP].src != self.local_ip:
-            flags = str(pkt[TCP].flags)
-            if flags == 'F':  # TCP FIN scan detection
-                if source_ip not in self.tcp_fin:
-                    self.tcp_fin[source_ip] = {"FIN": 0}
-                self.tcp_fin[source_ip]["FIN"] += 1
-                self.tcp_fin_scan(pkt)
-            elif flags == 'FPU':  # TCP x-Mas scan detection
-                if source_ip not in self.tcp_xmas:
-                    self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
-                self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
-                self.tcp_xmas_scan(pkt)
+        flags = pkt[TCP].flags
+        if flags == 'F':  # TCP FIN scan detection
+            if source_ip not in self.tcp_fin:
+                self.tcp_fin[source_ip] = {"FIN": 0}
+            self.tcp_fin[source_ip]["FIN"] += 1
+            self.tcp_fin_scan(pkt)
+        elif flags == 'FPU':  # TCP x-Mas scan detection
+            if source_ip not in self.tcp_xmas:
+                self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
+            self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
+            self.tcp_xmas_scan(pkt)
 
     def tcp_fin_scan(self, pkt):
         for ip in self.tcp_fin.keys():
@@ -75,8 +78,19 @@ class Detector:
     # Basically it starts a timer when the first TCP SYN packet is encountered.
     # If it detect a large number of SYN packets before the timer is elapsed, a SYN flood attack is may happening.
     def detect_syn_flood(self, pkt):
-
-
+        if pkt[TCP].flags == 'S':
+            if self.time_first_syn <= 0:
+                self.time_first_syn = t.time()
+            elif t.time() < (self.time_first_syn + self.SYN_FLOOD_DETECT_TIME):
+                # If we are here and we detect a huge amount of SYN packets,
+                # a SYN Flood attack is may happening.
+                self.tcp_syn_count += 1
+                if self.tcp_syn_count >= self.TCP_SYN_THRESHOLD:
+                    print("{} is performing a SYN Flood attack with {} packets".format(pkt[IP].src, self.tcp_syn_count))
+            else:
+                # If we are here it means that the timer is elapsed, so we need to reset some attributes
+                self.tcp_syn_count = 0
+                self.time_first_syn = 0
 
 # source_ip = pkt[IP].src
 # flags = str(pkt[TCP].flags)
