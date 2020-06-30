@@ -16,10 +16,11 @@ class Detector:
         self.tcp_xmas = dict()
         self.tcp_syn = dict()
         self.local_ip = gethostbyname(gethostname())  # local IP address
-        self.PORT_SCAN_THRESHOLD = 250
+        self.PORT_SCAN_THRESHOLD = 500
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
+    # It also performs the packets logging to a file.
     def inspect_packets(self, packet):
         # First we have to ignore packets that don't contain an IP header
         if IP not in packet:
@@ -30,28 +31,34 @@ class Detector:
         if packet[IP].src == self.local_ip:
             return
 
-        if TCP not in packet:
+        # Let's discard all packets that are not TCP, UDP or ICMP
+        if TCP not in packet and \
+           UDP not in packet and \
+           ICMP not in packet:
             return
 
         # At this point we have a packet which for sure has an IP
-        # header and it is directed to our machine.
+        # header, it contains TCP, UDP or ICMP segment and it is directed to our machine.
         # Now it's time to detect possible attacks.
         self.detect_port_scanning(packet)
         # detect_syn_flood(packet)
 
     def detect_port_scanning(self, pkt):
         source_ip = pkt[IP].src
-        flags = str(pkt[TCP].flags)
-        if flags == 'F':  # TCP FIN scan detection
-            if source_ip not in self.tcp_fin:
-                self.tcp_fin[source_ip] = {"FIN": 0}
-            self.tcp_fin[source_ip]["FIN"] += 1
-            self.tcp_fin_scan(pkt)
-        elif flags == 'FPU':  # TCP x-Mas scan detection
-            if source_ip not in self.tcp_xmas:
-                self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
-            self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
-            self.tcp_xmas_scan(pkt)
+
+        # We are about to detect only port scanning attempts that are made with TCP
+        if TCP in pkt:
+            flags = str(pkt[TCP].flags)
+            if flags == 'F':  # TCP FIN scan detection
+                if source_ip not in self.tcp_fin:
+                    self.tcp_fin[source_ip] = {"FIN": 0}
+                self.tcp_fin[source_ip]["FIN"] += 1
+                self.tcp_fin_scan(pkt)
+            elif flags == 'FPU':  # TCP x-Mas scan detection
+                if source_ip not in self.tcp_xmas:
+                    self.tcp_xmas[source_ip] = {"FIN-PSH-URG": 0}
+                self.tcp_xmas[source_ip]["FIN-PSH-URG"] += 1
+                self.tcp_xmas_scan(pkt)
 
     def tcp_fin_scan(self, pkt):
         for ip in self.tcp_fin.keys():
