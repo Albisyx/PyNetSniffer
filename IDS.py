@@ -20,7 +20,7 @@ class Detector:
         self.tcp_syn_count = 0
         self.PORT_SCAN_THRESHOLD = 500
         self.TCP_SYN_THRESHOLD = 500
-        self.SYN_FLOOD_DETECT_TIME = 5  # number of seconds within a SYN Flood attack must be detected
+        self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
