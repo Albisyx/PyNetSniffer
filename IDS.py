@@ -12,7 +12,9 @@ from socket import gethostname, gethostbyname
 
 
 class Detector:
-    def __init__(self):
+    def __init__(self, logger):
+        self.packets_logger = logger
+        # self.ids_logger = self.get_ids_logger()
         self.tcp_fin = dict()
         self.tcp_xmas = dict()
         self.local_ip = gethostbyname(gethostname())  # local IP address
@@ -22,6 +24,9 @@ class Detector:
         self.PORT_SCAN_THRESHOLD = 500
         self.TCP_SYN_THRESHOLD = 500
         self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
+
+    def get_ids_logger(self):
+        pass
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -40,8 +45,10 @@ class Detector:
         # At this point we have a packet which for sure has an IP header
         # and it contains TCP, UDP or ICMP segment.
 
-        # Log packets to a file
+        self.packets_count += 1
 
+        # It's time to log packets on a file
+        self.packets_logger.info(self.stringify_packet(packet))
 
         # Now it's time to detect possible attacks.
         # Since the detectable attacks use only TCP, let's filter packets that have not
@@ -49,6 +56,62 @@ class Detector:
         if TCP in packet and packet[IP].src != self.local_ip:
             self.detect_port_scanning(packet)
             self.detect_syn_flood(packet)
+
+    # Method which creates the string that represents the packet to be logged
+    def stringify_packet(self, packet):
+        str_pkt = '\nPacket number {}\n'.format(self.packets_count)
+        str_pkt += 'Total packet length: {}\n'.format(len(packet))
+
+        # Data Link level
+        str_pkt += '-[Data Link]-\n'
+        str_pkt += '  {:<16}  {}\n  {:<16}  {}\n'.format('Source MAC:', packet.src.upper(),
+                                                         'Destination MAC:', packet.dst.upper())
+
+        # IP level
+        str_pkt += '-[IP]-\n'
+        # Get the protocol name from his number
+        proto = ''
+        if packet[IP].proto == 1:
+            proto = 'ICMP'
+        elif packet[IP].proto == 6:
+            proto = 'TCP'
+        elif packet[IP].proto == 17:
+            proto = 'UDP'
+        str_pkt += '  {:<15}  {}\n  {:<15}  {}\n  {:<15}  {}\n'.format('Source IP:', packet[IP].src,
+                                                                       'Destination IP:', packet[IP].dst,
+                                                                       'Upper protocol:', proto)
+
+        # TCP, UDP or ICMP level
+        if proto == 'ICMP':
+            str_pkt += '-[ICMP]-\n'
+            str_pkt += '  {:<5} {}\n  {:<5} {}\n'.format('Type:', packet[ICMP].type,
+                                                         'Code:', packet[ICMP].code)
+        elif proto == 'UDP':
+            str_pkt += '-[UDP]-\n'
+            str_pkt += '  {:<17}  {}\n  {:<17}  {}\n'.format('Source port:', packet[UDP].sport,
+                                                             'Destination port:', packet[UDP].dport)
+        else:
+            flags_dict = \
+            {
+                'F': 'FIN',
+                'S': 'SYN',
+                'R': 'RST',
+                'P': 'PSH',
+                'A': 'ACK',
+                'U': 'URG',
+                'E': 'ECE',
+                'C': 'CWR',
+            }
+
+            str_pkt += '-[TCP]-\n'
+            str_pkt += '  {:<17}  {}\n  {:<17}  {}\n'.format('Source port:', packet[TCP].sport,
+                                                             'Destination port:', packet[TCP].dport)
+            flags = ''
+            for x in packet.sprintf('%TCP.flags%'):
+                flags += '{}, '.format(flags_dict[x])
+            str_pkt += '  {:<17}  {}\n'.format('Flags:', flags[:-2])
+            # str_pkt += '{}'.format(packet[3])
+        return str_pkt
 
     def detect_port_scanning(self, pkt):
         flags = pkt[TCP].flags

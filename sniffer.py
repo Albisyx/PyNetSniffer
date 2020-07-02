@@ -10,8 +10,8 @@ from IDS import Detector
 packets_logger = logging.getLogger(__name__)
 packets_logger.setLevel(logging.DEBUG)
 # Creation of the FileHandler
-current_datetime = datetime.now().strftime("%Y-%m-%d_%H:%M:%S")
-file_logs = logging.FileHandler("/Users/albertospadoni/Desktop/logs/captured_packets-{}".format(current_datetime))
+current_datetime = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+file_logs = logging.FileHandler(f"/Users/albertospadoni/Desktop/logs/captured_packets_{current_datetime}")
 file_logs_format = logging.Formatter("%(asctime)s::%(levelname)s:: %(message)s")
 file_logs.setFormatter(file_logs_format)
 # Creation of the StreamHandler
@@ -21,7 +21,7 @@ packets_logger.addHandler(file_logs)
 packets_logger.addHandler(console_logs)
 
 # Let's create the instance of the class responsible for the attacks detections and packets logging
-ids = Detector()
+ids = Detector(packets_logger)
 
 
 # Method for listing all the available interfaces to the user.
