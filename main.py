@@ -1,5 +1,6 @@
-# Main file
+# Main.py
 import sniffer
+
 
 def main():
     interface = sniffer.list_interfaces()

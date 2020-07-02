@@ -18,6 +18,7 @@ class Detector:
         self.local_ip = gethostbyname(gethostname())  # local IP address
         self.time_first_syn = 0  # timestamp of the first TCP SYN packet encountered
         self.tcp_syn_count = 0
+        self.packets_count = 0  # A simple counter of all the sniffed packets
         self.PORT_SCAN_THRESHOLD = 500
         self.TCP_SYN_THRESHOLD = 500
         self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
@@ -79,7 +80,7 @@ class Detector:
     # If it detect a large number of SYN packets before the timer is elapsed, a SYN flood attack is may happening.
     def detect_syn_flood(self, pkt):
         if pkt[TCP].flags == 'S':
-            if self.time_first_syn <= 0:
+            if self.time_first_syn == 0:
                 self.time_first_syn = t.time()
             elif t.time() < (self.time_first_syn + self.SYN_FLOOD_DETECT_TIME):
                 # If we are here and we detect a huge amount of SYN packets,
@@ -87,6 +88,10 @@ class Detector:
                 self.tcp_syn_count += 1
                 if self.tcp_syn_count == self.TCP_SYN_THRESHOLD:
                     print("{} is performing a SYN Flood attack".format(pkt[IP].src))
+                    # We want to reset the timer also just after we detect the SYN flood
+                    # and not only when the timer elapses
+                    self.tcp_syn_count = 0
+                    self.time_first_syn = 0
             else:
                 # If we are here it means that the timer is elapsed, so we need to reset some attributes
                 self.tcp_syn_count = 0
