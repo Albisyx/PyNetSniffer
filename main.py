@@ -1,4 +1,4 @@
-# Main.py
+#!/usr/bin/python3
 import sniffer
 
 
