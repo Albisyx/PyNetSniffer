@@ -1,4 +1,5 @@
-import struct
+import logging
+import datetime
 import time as t
 from scapy.layers.inet import *
 from scapy.layers.http import *
@@ -14,9 +15,9 @@ from socket import gethostname, gethostbyname
 
 
 class Detector:
-    def __init__(self, logger):
-        self.packets_logger = logger
-        # self.ids_logger = self.get_ids_logger()
+    def __init__(self):
+        self.packets_logger = self.get_packets_logger()
+        self.ids_logger = self.get_ids_logger()
         self.tcp_fin = dict()
         self.tcp_xmas = dict()
         self.local_ip = gethostbyname(gethostname())  # local IP address
@@ -26,9 +27,6 @@ class Detector:
         self.PORT_SCAN_THRESHOLD = 500
         self.TCP_SYN_THRESHOLD = 500
         self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
-
-    def get_ids_logger(self):
-        pass
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -50,7 +48,7 @@ class Detector:
         self.packets_count += 1
 
         # It's time to log packets on a file
-        self.packets_logger.info(self.stringify_packet(packet))
+        self.packets_logger.debug(self.stringify_packet(packet))
 
         # Now it's time to detect possible attacks.
         # Since the detectable attacks use only TCP, let's filter packets that have not
@@ -150,13 +148,21 @@ class Detector:
     def tcp_fin_scan(self, pkt):
         for ip in self.tcp_fin.keys():
             if self.tcp_fin[ip]["FIN"] > self.PORT_SCAN_THRESHOLD:
-                print("{} is performing a FIN port scan".format(pkt[IP].src))
+                log = "{} has sent you a relevant number of FIN packets.\n".format(pkt[IP].src)
+                log += "A FIN port scanning is probably happening...\n"
+                log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                self.ids_logger.warning(log)
+                # Reset the FIN count
                 self.tcp_fin[ip]["FIN"] = 0
 
     def tcp_xmas_scan(self, pkt):
         for ip in self.tcp_xmas.keys():
             if self.tcp_xmas[ip]["FIN-PSH-URG"] > self.PORT_SCAN_THRESHOLD:
-                print("{} is performing a X-Mas port scan".format(pkt[IP].src))
+                log = "{} has sent you a relevant number of FIN-PSH-URG packets.\n".format(pkt[IP].src)
+                log += "A X-Mas port scanning is probably happening...\n"
+                log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                self.ids_logger.warning(log)
+                # Reset the FIN-PSH-URG count
                 self.tcp_xmas[ip]["FIN-PSH-URG"] = 0
 
     # This method tries to detect a SYN Flood attack by using an interval of time.
@@ -171,7 +177,12 @@ class Detector:
                 # a SYN Flood attack is may happening.
                 self.tcp_syn_count += 1
                 if self.tcp_syn_count == self.TCP_SYN_THRESHOLD:
-                    print("{} is performing a SYN Flood attack".format(pkt[IP].src))
+                    log = "In the past {} seconds, you recieved a "
+                    log += "considerable number of SYN packet from {}.\n".format(self.SYN_FLOOD_DETECT_TIME,
+                                                                                 pkt[IP].src)
+                    log += "A SYN Flood attack is happening...\n"
+                    log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                    self.ids_logger.warning(log)
                     # We want to reset the timer also just after we detect the SYN flood
                     # and not only when the timer elapses
                     self.tcp_syn_count = 0
@@ -180,3 +191,43 @@ class Detector:
                 # If we are here it means that the timer is elapsed, so we need to reset some attributes
                 self.tcp_syn_count = 0
                 self.time_first_syn = 0
+
+    def get_packets_logger(self):
+        packets_logger = logging.getLogger("pcap")
+        packets_logger.setLevel(logging.DEBUG)
+
+        # Creation of the FileHandler in order to log packets into a file
+        current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_logs = logging.FileHandler(f"/Users/albertospadoni/Desktop/logs/captured_packets_{current_datetime}.txt")
+        file_logs_format = logging.Formatter("%(asctime)s:%(levelname)s: %(message)s")
+        file_logs.setFormatter(file_logs_format)
+
+        # Creation of the StreamHandler in order to log packets on the console
+        console_logs = logging.StreamHandler()
+        # Setting a different logging lvel for the console
+        console_logs.setLevel(logging.INFO)
+
+        # Adding the handlers just created
+        packets_logger.addHandler(file_logs)
+        packets_logger.addHandler(console_logs)
+
+        return packets_logger
+
+    def get_ids_logger(self):
+        ids_logger = logging.getLogger("ids")
+        ids_logger.setLevel(logging.WARNING)
+
+        # Creation of the FileHandler in order to log detected attacks into a file
+        current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        file_logs = logging.FileHandler(f"/Users/albertospadoni/Desktop/logs/attacks_detected_{current_datetime}.txt")
+        file_logs_format = logging.Formatter("%(asctime)s:%(levelname)s: %(message)s")
+        file_logs.setFormatter(file_logs_format)
+
+        # Creation of the StreamHandler in order to log detected attacks on the console
+        console_logs = logging.StreamHandler()
+
+        # Adding the handlers just created
+        ids_logger.addHandler(file_logs)
+        ids_logger.addHandler(console_logs)
+
+        return ids_logger
