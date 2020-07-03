@@ -1,5 +1,7 @@
+import struct
 import time as t
 from scapy.layers.inet import *
+from scapy.layers.http import *
 from socket import gethostname, gethostbyname
 
 # Class that implements the intrusion detection capabilities.
@@ -84,8 +86,8 @@ class Detector:
         # TCP, UDP or ICMP level
         if proto == 'ICMP':
             str_pkt += '-[ICMP]-\n'
-            str_pkt += '  {:<5} {}\n  {:<5} {}\n'.format('Type:', packet[ICMP].type,
-                                                         'Code:', packet[ICMP].code)
+            str_pkt += '  {:<5}  {}\n  {:<5}  {}\n'.format('Type:', packet[ICMP].type,
+                                                           'Code:', packet[ICMP].code)
         elif proto == 'UDP':
             str_pkt += '-[UDP]-\n'
             str_pkt += '  {:<17}  {}\n  {:<17}  {}\n'.format('Source port:', packet[UDP].sport,
@@ -110,7 +112,26 @@ class Detector:
             for x in packet.sprintf('%TCP.flags%'):
                 flags += '{}, '.format(flags_dict[x])
             str_pkt += '  {:<17}  {}\n'.format('Flags:', flags[:-2])
-            # str_pkt += '{}'.format(packet[3])
+
+            # Possible HTTP layer
+            if packet.haslayer(HTTP):
+                str_pkt += '-[HTTP]-\n'
+                if HTTPRequest in packet:
+                    # Method and HTTP version
+                    str_pkt += '  {:<11}  {}\n  {:<11}  {}\n'.format('Method:', str(packet[HTTPRequest].Method, "ascii"),
+                                                                     'Version:', str(packet[HTTPRequest].Http_Version, "ascii"))
+                    # Requested URI and Host URI
+                    str_pkt += '  {:<11}  {}\n  {:<11}  {}\n'.format('Path:', str(packet[HTTPRequest].Path, "ascii"),
+                                                                     'Host:', str(packet[HTTPRequest].Host, "ascii"))
+                    # User Agent
+                    str_pkt += '  {:<11}  {}\n'.format('User Agent:', str(packet[HTTPRequest].User_Agent, "ascii"))
+                elif HTTPResponse in packet:
+                    # Status code and phrase
+                    str_pkt += '  {:<8}  {} {}\n'.format('Status:', str(packet[HTTPResponse].Status_Code, "ascii"),
+                                                         str(packet[HTTPResponse].Reason_Phrase, "ascii"))
+                    # HTTP version and server type
+                    str_pkt += '  {:<8}  {}\n  {:<8}  {}\n'.format('Version:', str(packet[HTTPResponse].Http_Version, "ascii"),
+                                                                   'Server:', str(packet[HTTPResponse].Server, "ascii"))
         return str_pkt
 
     def detect_port_scanning(self, pkt):
