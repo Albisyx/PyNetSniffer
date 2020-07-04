@@ -3,6 +3,7 @@ import datetime
 import time as t
 from scapy.layers.inet import *
 from scapy.layers.http import *
+from scapy.layers.dns import *
 from socket import gethostname, gethostbyname
 
 
@@ -91,6 +92,54 @@ class Detector:
             str_pkt += '-[UDP]-\n'
             str_pkt += '  {:<17}  {}\n  {:<17}  {}\n'.format('Source port:', packet[UDP].sport,
                                                              'Destination port:', packet[UDP].dport)
+
+            # Possible DNS layer
+            # Simplified information regarding DNS
+            if packet.haslayer(DNS):
+                str_pkt += '-[DNS]-\n'
+                if not packet[DNS].qr:  # This is a DNS query
+                    str_pkt += '  {:<12}  {}\n'.format('Query name:', str(packet[DNS].qd[0].qname, "ascii")[:-1])
+                    # Getting query type from decimal ID
+                    query_type = ''
+                    if packet[DNS].qd[0].qtype == 1:
+                        query_type = 'A'
+                    elif packet[DNS].qd[0].qtype == 2:
+                        query_type = 'NS'
+                    elif packet[DNS].qd[0].qtype == 5:
+                        query_type = 'CNAME'
+                    elif packet[DNS].qd[0].qtype == 12:
+                        query_type = 'PTR'
+                    str_pkt += '  {:<12}  {}\n'.format('Query type:', query_type)
+                    # Getting query class from decimal ID
+                    query_class = ''
+                    if packet[DNS].qd[0].qclass == 1:
+                        query_class = 'IN'
+                    str_pkt += '  {:<12}  {}\n'.format('Query class:', query_class)
+                else:  # This is a DNS response
+                    if packet[DNS].ancount > 0:
+                        # If we are here it means that we have at least a normal answer
+                        dns_answer = packet[DNS].an[0]
+                    else:
+                        # If we are here it means that we only have an authority answer
+                        dns_answer = packet[DNS].ns[0]
+
+                    str_pkt += '  {:<13}  {}\n'.format('Answer name:', str(dns_answer.rrname, "ascii")[:-1])
+                    # Getting answer type from decimal ID
+                    answer_type = ''
+                    if dns_answer.type == 1:
+                        answer_type = 'A'
+                    elif dns_answer.type == 2:
+                        answer_type = 'NS'
+                    elif dns_answer.type == 5:
+                        answer_type = 'CNAME'
+                    elif dns_answer.type == 12:
+                        answer_type = 'PTR'
+                    str_pkt += '  {:<13}  {}\n'.format('Answer type:', answer_type)
+                    # Getting query class from decimal ID
+                    answer_class = ''
+                    if dns_answer.rclass == 1:
+                        answer_class = 'IN'
+                    str_pkt += '  {:<13}  {}\n'.format('Answer class:', answer_class)
         else:
             flags_dict = \
             {
