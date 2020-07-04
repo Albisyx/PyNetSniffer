@@ -21,7 +21,7 @@ def list_interfaces():
         i += 1
 
     selection = get_interface(len(interfaces))
-    ids.packets_logger.info("Start listening on interface {}".format(interfaces[selection - 1]))
+    ids.packets_logger.info("Start listening on interface {}...\n".format(interfaces[selection - 1]))
     return interfaces[selection - 1]
 
 

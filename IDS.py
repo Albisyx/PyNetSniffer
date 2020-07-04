@@ -5,6 +5,7 @@ from scapy.layers.inet import *
 from scapy.layers.http import *
 from socket import gethostname, gethostbyname
 
+
 # Class that implements the intrusion detection capabilities.
 # The two attacks that will be detected are:
 # 1) port scanning attempts
@@ -116,8 +117,10 @@ class Detector:
                 str_pkt += '-[HTTP]-\n'
                 if HTTPRequest in packet:
                     # Method and HTTP version
-                    str_pkt += '  {:<11}  {}\n  {:<11}  {}\n'.format('Method:', str(packet[HTTPRequest].Method, "ascii"),
-                                                                     'Version:', str(packet[HTTPRequest].Http_Version, "ascii"))
+                    str_pkt += '  {:<11}  {}\n  {:<11}  {}\n'.format('Method:',
+                                                                     str(packet[HTTPRequest].Method, "ascii"),
+                                                                     'Version:',
+                                                                     str(packet[HTTPRequest].Http_Version, "ascii"))
                     # Requested URI and Host URI
                     str_pkt += '  {:<11}  {}\n  {:<11}  {}\n'.format('Path:', str(packet[HTTPRequest].Path, "ascii"),
                                                                      'Host:', str(packet[HTTPRequest].Host, "ascii"))
@@ -128,7 +131,8 @@ class Detector:
                     str_pkt += '  {:<8}  {} {}\n'.format('Status:', str(packet[HTTPResponse].Status_Code, "ascii"),
                                                          str(packet[HTTPResponse].Reason_Phrase, "ascii"))
                     # HTTP version and server type
-                    str_pkt += '  {:<8}  {}\n  {:<8}  {}\n'.format('Version:', str(packet[HTTPResponse].Http_Version, "ascii"),
+                    str_pkt += '  {:<8}  {}\n  {:<8}  {}\n'.format('Version:',
+                                                                   str(packet[HTTPResponse].Http_Version, "ascii"),
                                                                    'Server:', str(packet[HTTPResponse].Server, "ascii"))
         return str_pkt
 
@@ -177,11 +181,10 @@ class Detector:
                 # a SYN Flood attack is may happening.
                 self.tcp_syn_count += 1
                 if self.tcp_syn_count == self.TCP_SYN_THRESHOLD:
-                    log = "In the past {} seconds, you recieved a "
-                    log += "considerable number of SYN packet from {}.\n".format(self.SYN_FLOOD_DETECT_TIME,
-                                                                                 pkt[IP].src)
-                    log += "A SYN Flood attack is happening...\n"
-                    log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                    log = "In the past {} seconds you received a ".format(self.SYN_FLOOD_DETECT_TIME)
+                    log += "considerable number of SYN packet from {}.\n".format(pkt[IP].src)
+                    log += "A SYN Flood attack is probably happening...\n"
+                    log += "The packet that triggered this alert is the number {}".format(self.packets_count)
                     self.ids_logger.warning(log)
                     # We want to reset the timer also just after we detect the SYN flood
                     # and not only when the timer elapses
