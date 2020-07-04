@@ -1,3 +1,4 @@
+#!/usr/bin/python3
 import time
 import argparse
 from scapy.all import *
@@ -84,7 +85,7 @@ def main():
 
     parser.add_argument('-ip',
                         required=True,
-                        metavar='destination ipv4 address'.upper())
+                        metavar='target ipv4 address'.upper())
 
     parser.add_argument('-n',
                         type=int,
