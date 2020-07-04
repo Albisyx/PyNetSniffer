@@ -19,7 +19,7 @@ from socket import gethostname, gethostbyname
 
 class Detector:
     def __init__(self):
-        self.log_path = '/Users/albertospadoni/Desktop/logs/'
+        self.log_path = '/var/log/PyNetSniffer/'
         self.packets_logger = self.get_packets_logger()  # packet's info logger
         self.ids_logger = self.get_ids_logger()          # IDS's warnings logger
         self.tcp_fin = dict()                            # dictionary that contains IP addresses and their related
@@ -238,7 +238,7 @@ class Detector:
                     log = "In the past {} seconds you received a ".format(self.SYN_FLOOD_DETECT_TIME)
                     log += "considerable number of SYN packet from {}.\n".format(pkt[IP].src)
                     log += "A SYN Flood attack is probably happening...\n"
-                    log += "The packet that triggered this alert is the number {}".format(self.packets_count)
+                    log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
                     self.ids_logger.warning(log)
                     # We want to reset the timer also just after we detect the SYN flood
                     # and not only when the timer elapses
@@ -282,7 +282,7 @@ class Detector:
 
         # Creation of the FileHandler in order to log detected attacks into a file
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_logs = logging.FileHandler(f"/Users/albertospadoni/Desktop/logs/attacks_detected_{current_datetime}.txt")
+        file_logs = logging.FileHandler(f"{self.log_path}attacks_detected_{current_datetime}.txt")
         file_logs_format = logging.Formatter("%(asctime)s:%(levelname)s: %(message)s")
         file_logs.setFormatter(file_logs_format)
 
