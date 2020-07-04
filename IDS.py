@@ -1,3 +1,4 @@
+import os
 import logging
 import datetime
 import time as t
@@ -18,17 +19,20 @@ from socket import gethostname, gethostbyname
 
 class Detector:
     def __init__(self):
-        self.packets_logger = self.get_packets_logger()
-        self.ids_logger = self.get_ids_logger()
-        self.tcp_fin = dict()
-        self.tcp_xmas = dict()
-        self.local_ip = gethostbyname(gethostname())  # local IP address
-        self.time_first_syn = 0  # timestamp of the first TCP SYN packet encountered
-        self.tcp_syn_count = 0
-        self.packets_count = 0  # A simple counter of all the sniffed packets
-        self.PORT_SCAN_THRESHOLD = 500
-        self.TCP_SYN_THRESHOLD = 500
-        self.SYN_FLOOD_DETECT_TIME = 3  # number of seconds within a SYN Flood attack must be detected
+        self.log_path = '/Users/albertospadoni/Desktop/logs/'
+        self.packets_logger = self.get_packets_logger()  # packet's info logger
+        self.ids_logger = self.get_ids_logger()          # IDS's warnings logger
+        self.tcp_fin = dict()                            # dictionary that contains IP addresses and their related
+                                                         # number of FIN packets received
+        self.tcp_xmas = dict()                           # dictionary that contains IP addresses and their related
+                                                         # number of FIN_PSH-URG packets received
+        self.local_ip = gethostbyname(gethostname())     # local IP address
+        self.time_first_syn = 0                          # timestamp of the first TCP SYN packet encountered
+        self.tcp_syn_count = 0                           # counter of TCP SYN packets received
+        self.packets_count = 0                           # simple counter of all the sniffed packets
+        self.PORT_SCAN_THRESHOLD = 500                   # number of packets after which a warning is generated
+        self.TCP_SYN_THRESHOLD = 500                     # number of packets after which a warning is generated
+        self.SYN_FLOOD_DETECT_TIME = 3                   # number of seconds within a SYN Flood attack will be detected
 
     # The following method is called whenever a packet is sniffed on the selected
     # interface and it initializes the process of detecting the attacks.
@@ -185,6 +189,7 @@ class Detector:
                                                                    'Server:', str(packet[HTTPResponse].Server, "ascii"))
         return str_pkt
 
+    # The following 3 methods are used for detecting port scanning attempts
     def detect_port_scanning(self, pkt):
         flags = pkt[TCP].flags
         if flags == 'F':  # TCP FIN scan detection
@@ -244,13 +249,18 @@ class Detector:
                 self.tcp_syn_count = 0
                 self.time_first_syn = 0
 
+    # Method that configures the logger used to store packets informations
     def get_packets_logger(self):
         packets_logger = logging.getLogger("pcap")
         packets_logger.setLevel(logging.DEBUG)
 
         # Creation of the FileHandler in order to log packets into a file
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        file_logs = logging.FileHandler(f"/Users/albertospadoni/Desktop/logs/captured_packets_{current_datetime}.txt")
+        # The path used to save log file is /var/log/PyNetSniffer
+        # Check if we have all the directories needed
+        if not os.path.exists(self.log_path):
+            os.makedirs(self.log_path)
+        file_logs = logging.FileHandler(f"{self.log_path}captured_packets_{current_datetime}.txt")
         file_logs_format = logging.Formatter("%(asctime)s:%(levelname)s: %(message)s")
         file_logs.setFormatter(file_logs_format)
 
@@ -265,6 +275,7 @@ class Detector:
 
         return packets_logger
 
+    # Method that configure the logger used to store IDS warnings
     def get_ids_logger(self):
         ids_logger = logging.getLogger("ids")
         ids_logger.setLevel(logging.WARNING)
