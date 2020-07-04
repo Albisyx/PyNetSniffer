@@ -21,6 +21,7 @@ def list_interfaces():
         i += 1
 
     selection = get_interface(len(interfaces))
+    # Let's log the selected interface to better understand where the packets are from
     ids.packets_logger.info("Start listening on interface {}...\n".format(interfaces[selection - 1]))
     return interfaces[selection - 1]
 
@@ -44,6 +45,7 @@ def get_interface(bound):
     return value
 
 
+# Method that contains the invocation at the sniff function
 def start_sniffing(interface):
     sniff(iface=interface,          # interface to listen on
           prn=ids.inspect_packets,  # function to execute for each sniffed packet

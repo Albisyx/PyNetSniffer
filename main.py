@@ -1,6 +1,8 @@
 #!/usr/bin/python3
 import sniffer
 
+# GitHub repository: https://github.com/Albisyx/PyNetSniffer
+
 
 def main():
     interface = sniffer.list_interfaces()
