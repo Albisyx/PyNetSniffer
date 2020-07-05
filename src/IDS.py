@@ -240,7 +240,7 @@ class Detector:
                 self.tcp_syn_count += 1
                 if self.tcp_syn_count == self.TCP_SYN_THRESHOLD:
                     log = "In the past {} seconds you received a ".format(self.SYN_FLOOD_DETECT_TIME)
-                    log += "considerable number of SYN packet from {}.\n".format(pkt[IP].src)
+                    log += "considerable number of SYN packet from {}\n".format(pkt[IP].src)
                     log += "A SYN Flood attack is probably happening...\n"
                     log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
                     # Let's log the warning both to a file and on the console
