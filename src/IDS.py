@@ -10,7 +10,7 @@ from socket import gethostname, gethostbyname
 
 # Class that implements the intrusion detection capabilities.
 # The two attacks that will be detected are:
-# 1) port scanning attempts
+# 1) Port scanning attempts
 #    The following port scans attempts will be detected:
 #    - TCP FIN port scanning
 #    - TCP X-Mas port scanning
@@ -19,30 +19,30 @@ from socket import gethostname, gethostbyname
 
 class Detector:
     def __init__(self):
-        self.log_path = '/var/log/PyNetSniffer/'
+        self.log_path = '/var/log/PyNetSniffer/'         # default path for the log files
         self.packets_logger = self.get_packets_logger()  # packet's info logger
         self.ids_logger = self.get_ids_logger()          # IDS's warnings logger
         self.tcp_fin = dict()                            # dictionary that contains IP addresses and their related
-                                                         # number of FIN packets received
+                                                         # number of FIN packets sent
         self.tcp_xmas = dict()                           # dictionary that contains IP addresses and their related
-                                                         # number of FIN_PSH-URG packets received
-        self.local_ip = gethostbyname(gethostname())     # local IP address
+                                                         # number of FIN-PSH-URG packets sent
+        self.local_ip = gethostbyname(gethostname())     # host IP address
         self.time_first_syn = 0                          # timestamp of the first TCP SYN packet encountered
         self.tcp_syn_count = 0                           # counter of TCP SYN packets received
         self.packets_count = 0                           # simple counter of all the sniffed packets
-        self.PORT_SCAN_THRESHOLD = 500                   # number of packets after which a warning is generated
-        self.TCP_SYN_THRESHOLD = 500                     # number of packets after which a warning is generated
-        self.SYN_FLOOD_DETECT_TIME = 3                   # number of seconds within a SYN Flood attack will be detected
+        self.PORT_SCAN_THRESHOLD = 500                   # number of FIN-PSH-URG packets after which a warning is generated
+        self.TCP_SYN_THRESHOLD = 500                     # number of SYN packets after which a warning is generated
+        self.SYN_FLOOD_DETECT_TIME = 3                   # number of seconds within a SYN Flood attack is detected
 
     # The following method is called whenever a packet is sniffed on the selected
-    # interface and it initializes the process of detecting the attacks.
+    # interface. It initializes the process of attacks detection.
     # It also performs the packets logging to a file.
     def inspect_packets(self, packet):
         # First we have to ignore packets that don't contain an IP header
         if IP not in packet:
             return
 
-        # Let's discard all packets that are not TCP, UDP or ICMP in order to log them
+        # Let's also discard all packets that are not TCP, UDP or ICMP
         if TCP not in packet and \
            UDP not in packet and \
            ICMP not in packet:
@@ -53,7 +53,7 @@ class Detector:
 
         self.packets_count += 1
 
-        # It's time to log packets on a file
+        # Here we log the current packet to a file
         self.packets_logger.debug(self.stringify_packet(packet))
 
         # Now it's time to detect possible attacks.
@@ -68,12 +68,12 @@ class Detector:
         str_pkt = '\nPacket number {}\n'.format(self.packets_count)
         str_pkt += 'Total packet length: {}\n'.format(len(packet))
 
-        # Data Link level
+        # Data Link layer
         str_pkt += '-[Data Link]-\n'
         str_pkt += '  {:<16}  {}\n  {:<16}  {}\n'.format('Source MAC:', packet.src.upper(),
                                                          'Destination MAC:', packet.dst.upper())
 
-        # IP level
+        # IP layer
         str_pkt += '-[IP]-\n'
         # Get the protocol name from his number
         proto = ''
@@ -87,7 +87,7 @@ class Detector:
                                                                        'Destination IP:', packet[IP].dst,
                                                                        'Upper protocol:', proto)
 
-        # TCP, UDP or ICMP level
+        # TCP, UDP or ICMP layer
         if proto == 'ICMP':
             str_pkt += '-[ICMP]-\n'
             str_pkt += '  {:<5}  {}\n  {:<5}  {}\n'.format('Type:', packet[ICMP].type,
@@ -139,12 +139,12 @@ class Detector:
                     elif dns_answer.type == 12:
                         answer_type = 'PTR'
                     str_pkt += '  {:<13}  {}\n'.format('Answer type:', answer_type)
-                    # Getting query class from decimal ID
+                    # Getting answer class from decimal ID
                     answer_class = ''
                     if dns_answer.rclass == 1:
                         answer_class = 'IN'
                     str_pkt += '  {:<13}  {}\n'.format('Answer class:', answer_class)
-        else:
+        else:  # TCP layer
             flags_dict = \
             {
                 'F': 'FIN',
@@ -160,6 +160,8 @@ class Detector:
             str_pkt += '-[TCP]-\n'
             str_pkt += '  {:<17}  {}\n  {:<17}  {}\n'.format('Source port:', packet[TCP].sport,
                                                              'Destination port:', packet[TCP].dport)
+            
+            # Get the full flag name using the above dictionary
             flags = ''
             for x in packet.sprintf('%TCP.flags%'):
                 flags += '{}, '.format(flags_dict[x])
@@ -196,36 +198,38 @@ class Detector:
             if pkt[IP].src not in self.tcp_fin:
                 self.tcp_fin[pkt[IP].src] = {"FIN": 0}
             self.tcp_fin[pkt[IP].src]["FIN"] += 1
-            self.tcp_fin_scan(pkt)
+            self.tcp_fin_scan(pkt[IP].src)
         elif flags == 'FPU':  # TCP x-Mas scan detection
             if pkt[IP].src not in self.tcp_xmas:
                 self.tcp_xmas[pkt[IP].src] = {"FIN-PSH-URG": 0}
             self.tcp_xmas[pkt[IP].src]["FIN-PSH-URG"] += 1
-            self.tcp_xmas_scan(pkt)
+            self.tcp_xmas_scan(pkt[IP].src)
 
-    def tcp_fin_scan(self, pkt):
+    def tcp_fin_scan(self, source_ip):
         for ip in self.tcp_fin.keys():
             if self.tcp_fin[ip]["FIN"] > self.PORT_SCAN_THRESHOLD:
-                log = "{} has sent you a relevant number of FIN packets.\n".format(pkt[IP].src)
+                log = "{} has sent you a relevant number of FIN packets.\n".format(source_ip)
                 log += "A FIN port scanning is probably happening...\n"
                 log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                # Let's log the warning both to a file and on the console
                 self.ids_logger.warning(log)
                 # Reset the FIN count
                 self.tcp_fin[ip]["FIN"] = 0
 
-    def tcp_xmas_scan(self, pkt):
+    def tcp_xmas_scan(self, source_ip):
         for ip in self.tcp_xmas.keys():
             if self.tcp_xmas[ip]["FIN-PSH-URG"] > self.PORT_SCAN_THRESHOLD:
-                log = "{} has sent you a relevant number of FIN-PSH-URG packets.\n".format(pkt[IP].src)
+                log = "{} has sent you a relevant number of FIN-PSH-URG packets.\n".format(source_ip)
                 log += "A X-Mas port scanning is probably happening...\n"
                 log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                # Let's log the warning both to a file and on the console
                 self.ids_logger.warning(log)
                 # Reset the FIN-PSH-URG count
                 self.tcp_xmas[ip]["FIN-PSH-URG"] = 0
 
     # This method tries to detect a SYN Flood attack by using an interval of time.
     # Basically it starts a timer when the first TCP SYN packet is encountered.
-    # If it detect a large number of SYN packets before the timer is elapsed, a SYN flood attack is may happening.
+    # If it detect a large number of SYN packets before the timer is elapsed, a SYN Flood attack is may happening.
     def detect_syn_flood(self, pkt):
         if pkt[TCP].flags == 'S':
             if self.time_first_syn == 0:
@@ -239,13 +243,15 @@ class Detector:
                     log += "considerable number of SYN packet from {}.\n".format(pkt[IP].src)
                     log += "A SYN Flood attack is probably happening...\n"
                     log += "The packet that triggered this alert is the number {}\n".format(self.packets_count)
+                    # Let's log the warning both to a file and on the console
                     self.ids_logger.warning(log)
-                    # We want to reset the timer also just after we detect the SYN flood
+                    # We want to reset the timer also just after we detect the SYN Flood
                     # and not only when the timer elapses
                     self.tcp_syn_count = 0
                     self.time_first_syn = 0
             else:
-                # If we are here it means that the timer is elapsed, so we need to reset some attributes
+                # If we are here it means that the timer is elapsed without detecting any attack,
+                # so we need to reset some attributes
                 self.tcp_syn_count = 0
                 self.time_first_syn = 0
 
@@ -254,9 +260,9 @@ class Detector:
         packets_logger = logging.getLogger("pcap")
         packets_logger.setLevel(logging.DEBUG)
 
-        # Creation of the FileHandler in order to log packets into a file
+        # Creation of the FileHandler in order to log packets to a file
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        # The path used to save log file is /var/log/PyNetSniffer
+        # The default path used to save log file is /var/log/PyNetSniffer/
         # Check if we have all the directories needed
         if not os.path.exists(self.log_path):
             os.makedirs(self.log_path)
@@ -266,7 +272,7 @@ class Detector:
 
         # Creation of the StreamHandler in order to log packets on the console
         console_logs = logging.StreamHandler()
-        # Setting a different logging lvel for the console
+        # Setting a different logging level for the console
         console_logs.setLevel(logging.INFO)
 
         # Adding the handlers just created
@@ -280,7 +286,7 @@ class Detector:
         ids_logger = logging.getLogger("ids")
         ids_logger.setLevel(logging.WARNING)
 
-        # Creation of the FileHandler in order to log detected attacks into a file
+        # Creation of the FileHandler in order to log detected attacks to a file
         current_datetime = datetime.datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
         file_logs = logging.FileHandler(f"{self.log_path}attacks_detected_{current_datetime}.txt")
         file_logs_format = logging.Formatter("%(asctime)s:%(levelname)s: %(message)s")
